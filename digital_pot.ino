@@ -13,6 +13,12 @@ const int up_button = 7;
 const int down_button = 6;
 const int rst_button = 11;
 
+#define pulse_ip 8
+int ontime,offtime,duty;
+float freq,period;
+
+
+
 volatile unsigned int C1 = 0, C2 = 0, sumDiff = 0, capNum, numCaptures=0;
 volatile bool state = false, timer1CountDone = false; float f = 0;
 
@@ -48,6 +54,7 @@ byte FF[8] = {
 };
 
 void setup() {
+  pinMode(pulse_ip,INPUT);
   pinMode(A0, OUTPUT);
   pinMode(A1, OUTPUT);
   pinMode(A2, OUTPUT);
@@ -61,9 +68,6 @@ void setup() {
   lcd.createChar(3, FF);
   lcd.begin(16, 2);
   lcd.clear();
-  lcd.write(byte(1));
-  lcd.write(byte(2));
-  lcd.write(byte(3));
   lcd.write(byte(1));
   lcd.write(byte(2));
   lcd.write(byte(3));
@@ -115,8 +119,25 @@ ISR(TIMER1_OVF_vect)
 
 
 void loop() {
+   ontime = pulseIn(pulse_ip,HIGH);
+   offtime = pulseIn(pulse_ip,LOW);
+   period = ontime+offtime;
+   freq = 1000000.0/period;
+   duty = (ontime/period)*100; 
+   Serial.println(ontime);
+   Serial.println(offtime);
+   Serial.println(period);
+   Serial.println(freq);
+   Serial.println(duty);
   if (Serial.available()) DoSerial(); 
-  Serial.println(analogRead(A4));
+  //int Raw_Ampl;
+  //float Amplitude;
+  //Raw_Ampl = analogRead(WIPER_PIN);
+  //Serial.println(Raw_Ampl);
+  //Amplitude = Raw_Ampl * 5.0 / 1023.0;
+  //Amplitude = ((Raw_Ampl * V_REF) / 1023.0);
+  //lcd.print(" Ampl: ");
+  //Serial.println(Amplitude);
   UP = digitalRead(up_button);
   DOWN = digitalRead(down_button);
   RST = digitalRead(rst_button);
@@ -157,7 +178,8 @@ void loop() {
   timer1CountDone = false;
   lcd.setCursor(0,1);
   lcd.print("Freq: ");
-  lcd.print(f);
+  lcd.print(f,2);
+  lcd.print("Hz ");
 }
 
 void DoSerial()
