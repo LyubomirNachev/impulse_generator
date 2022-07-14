@@ -4,7 +4,7 @@ const float V_REF = 5.0;
 int UP = 0;
 int DOWN = 1;
 int RST = 0;
-const int UD_PIN = 8;       
+const int UD_PIN = 4;       
 const int INC_PIN = 9;    
 const int CS_PIN = 10;      
 const int WIPER_PIN = A5;     
@@ -13,6 +13,8 @@ const int up_button = 7;
 const int down_button = 6;
 const int rst_button = 11;
 
+volatile unsigned int C1 = 0, C2 = 0, sumDiff = 0, capNum, numCaptures=0;
+volatile bool state = false, timer1CountDone = false; float f = 0;
 
 byte RF[8] = {
   0b00001,
@@ -78,7 +80,39 @@ void setup() {
   digitalWrite(INC_PIN, HIGH);
   digitalWrite(UD_PIN, HIGH);
   digitalWrite(CS_PIN, LOW);
+
+  analogReference(INTERNAL);
+  
+  //Timer 1: input capture interrupt (pin D8) & overflow interrupt
+  noInterrupts();
+  TCCR1A = 0; TCCR1B = 0; //reset control registers
+  TCNT1 = 0;              //reset counter register
+  TCCR1B |= 0b11000100;   //256 prescaler, rising edge, noise canceler
+  TIMSK1 |= 0b00100001;   //enable input capture & overflow interrupts
+  interrupts();
 }
+
+
+ISR(TIMER1_CAPT_vect)
+{
+  capNum++;
+  if(capNum == 1) C1 = ICR1;
+  if(capNum == 2)
+  {
+    C2 = ICR1;
+    sumDiff += (C2 - C1);
+    numCaptures++;
+    C1 = 0; C2 = 0; capNum = 0;
+  }
+}
+//-----------------------------
+ISR(TIMER1_OVF_vect)
+{
+  C1 = 0; C2 = 0; capNum = 0;
+  timer1CountDone = true;
+  state = !state;
+}
+
 
 void loop() {
   if (Serial.available()) DoSerial(); 
@@ -115,6 +149,15 @@ void loop() {
   }else{
     delay(50);
   }
+  while(!timer1CountDone) {}
+  //--------------------------------------------------
+  f = 1/(float(sumDiff/numCaptures)*16.0e-6);
+  numCaptures = 0;
+  sumDiff = 0;
+  timer1CountDone = false;
+  lcd.setCursor(0,1);
+  lcd.print("Freq: ");
+  lcd.print(f);
 }
 
 void DoSerial()
